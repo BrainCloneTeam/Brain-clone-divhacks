@@ -82,27 +82,50 @@ export default function Home() {
         const places = Array.isArray(entities.places) ? entities.places : [];
         const events = Array.isArray(entities.events) ? entities.events : [];
         
-        // Add entities as nodes
+        // Add entities as nodes with proper GraphNode structure
         const entitiesToAdd = [
           ...people.map((person: string) => ({
             id: `person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: person,
             type: 'person' as const,
-            group: 1
+            val: 8,
+            color: '#3B82F6', // Blue for people
+            metadata: { source: 'journal', timestamp: new Date().toISOString() }
           })),
           ...places.map((place: string) => ({
             id: `place_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: place,
             type: 'location' as const,
-            group: 2
+            val: 6,
+            color: '#EF4444', // Red for locations
+            metadata: { source: 'journal', timestamp: new Date().toISOString() }
           })),
           ...events.map((event: string) => ({
             id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: event,
             type: 'event' as const,
-            group: 3
+            val: 7,
+            color: '#10B981', // Green for events
+            metadata: { source: 'journal', timestamp: new Date().toISOString() }
           }))
         ];
+        
+        // Create connections between entities from the same journal entry
+        const newLinks = [];
+        if (entitiesToAdd.length > 1) {
+          // Connect all entities from this journal entry to each other
+          for (let i = 0; i < entitiesToAdd.length; i++) {
+            for (let j = i + 1; j < entitiesToAdd.length; j++) {
+              newLinks.push({
+                source: entitiesToAdd[i].id,
+                target: entitiesToAdd[j].id,
+                relationship: 'mentioned_together',
+                strength: 0.8,
+                color: '#94A3B8'
+              });
+            }
+          }
+        }
         
         // Add nodes to current graph data with proper initialization
         const currentNodes = Array.isArray(graphData?.nodes) ? graphData.nodes : [];
@@ -110,10 +133,14 @@ export default function Home() {
         
         setGraphData({
           nodes: [...currentNodes, ...entitiesToAdd],
-          links: currentLinks
+          links: [...currentLinks, ...newLinks]
         });
         
         console.log('Added entities to graph:', entitiesToAdd);
+        console.log('Added connections:', newLinks);
+        
+        // Show success message
+        alert(`✅ Added ${entitiesToAdd.length} entities to your knowledge graph!`);
       }
       
       // Clear the input
