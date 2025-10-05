@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "BrainClone - Knowledge Graph Visualization",
-  description: "AI-powered knowledge graph for bringing your memories to life",
+  description: "AI-powered knowledge graph for bringing your memories to life.",
 };
 
 export default function RootLayout({

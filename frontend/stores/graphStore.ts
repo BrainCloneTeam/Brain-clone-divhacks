@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { GraphData, GraphNode, GraphLink, NodeType } from '@/types/graph';
 
 // Function to sync graph data to API for cross-device persistence
@@ -150,10 +150,43 @@ export const useGraphStore = create<GraphState>()(
 }),
 {
   name: 'brainclone-graph-storage', // unique name for localStorage key
-  partialize: (state) => ({ 
-    graphData: state.graphData,
-    // Don't persist UI state like selectedNode, searchQuery, etc.
-  }),
+  storage: createJSONStorage(() => ({
+    getItem: (name: string) => localStorage.getItem(name),
+    setItem: (name: string, value: string) => {
+      // Avoid re-writing identical data to reduce quota usage
+      if (localStorage.getItem(name) === value) return;
+      try {
+        localStorage.setItem(name, value);
+      } catch (e) {
+        // Best-effort: on quota errors, drop persistence for this write
+        console.warn('Persist storage quota reached, skipping save');
+      }
+    },
+    removeItem: (name: string) => localStorage.removeItem(name)
+  })),
+  partialize: (state) => {
+    // Persist a minimized snapshot to reduce size: strip coordinates and transient fields
+    const nodes = Array.isArray(state.graphData?.nodes)
+      ? state.graphData.nodes.map((n) => ({
+          id: n.id,
+          name: n.name,
+          type: n.type,
+          val: n.val,
+          color: n.color,
+          metadata: n.metadata,
+        }))
+      : [];
+    const links = Array.isArray(state.graphData?.links)
+      ? state.graphData.links.map((l) => ({
+          source: typeof l.source === 'string' ? l.source : l.source.id,
+          target: typeof l.target === 'string' ? l.target : l.target.id,
+          relationship: l.relationship,
+          strength: l.strength,
+          color: l.color,
+        }))
+      : [];
+    return { graphData: { nodes, links } };
+  },
 }
   )
 );

@@ -106,7 +106,7 @@ export default function Home() {
           id: journalEntryId,
           name: analysis.title || `Journal Entry ${new Date().toLocaleDateString()}`,
           type: 'journal' as const,
-          val: 10,
+          val: 1, // match default node size
           color: '#8B5CF6', // Purple for journal entries
           metadata: { 
             source: 'journal', 
@@ -124,7 +124,7 @@ export default function Home() {
             id: `person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: person,
             type: 'person' as const,
-            val: 8,
+            val: 1, // match default node size
             color: '#3B82F6', // Blue for people
             metadata: { source: 'journal', timestamp: new Date().toISOString() }
           })),
@@ -132,7 +132,7 @@ export default function Home() {
             id: `place_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: place,
             type: 'location' as const,
-            val: 6,
+            val: 1, // match default node size
             color: '#EF4444', // Red for locations
             metadata: { source: 'journal', timestamp: new Date().toISOString() }
           })),
@@ -140,7 +140,7 @@ export default function Home() {
             id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: event,
             type: 'event' as const,
-            val: 7,
+            val: 1, // match default node size
             color: '#10B981', // Green for events
             metadata: { source: 'journal', timestamp: new Date().toISOString() }
           }))
@@ -564,12 +564,26 @@ function SelectedNodeInfo() {
       <p className="text-sm text-gray-300 capitalize mb-2">Type: {selectedNode.type}</p>
       {selectedNode.metadata && (
         <div className="text-sm text-gray-400">
-          {Object.entries(selectedNode.metadata).map(([key, value]) => (
-            <div key={key} className="mb-1">
-              <span className="capitalize">{key}: </span>
-              <span>{String(value)}</span>
-            </div>
-          ))}
+          {Object.entries(selectedNode.metadata).map(([key, value]) => {
+            let display: string;
+            if (value === null || value === undefined) {
+              display = '';
+            } else if (typeof value === 'object') {
+              try {
+                display = JSON.stringify(value);
+              } catch {
+                display = String(value);
+              }
+            } else {
+              display = String(value);
+            }
+            return (
+              <div key={key} className="mb-1">
+                <span className="capitalize">{key}: </span>
+                <span>{display}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
