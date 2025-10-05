@@ -54,12 +54,12 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   removeNode: (nodeId) =>
     set((state) => ({
       graphData: {
-        nodes: state.graphData.nodes.filter((n) => n.id !== nodeId),
-        links: state.graphData.links.filter(
+        nodes: Array.isArray(state.graphData?.nodes) ? state.graphData.nodes.filter((n) => n.id !== nodeId) : [],
+        links: Array.isArray(state.graphData?.links) ? state.graphData.links.filter(
           (l) =>
             (typeof l.source === 'string' ? l.source : l.source.id) !== nodeId &&
             (typeof l.target === 'string' ? l.target : l.target.id) !== nodeId
-        ),
+        ) : [],
       },
     })),
 
@@ -85,11 +85,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     set((state) => ({
       graphData: {
         ...state.graphData,
-        links: state.graphData.links.filter((l) => {
+        links: Array.isArray(state.graphData?.links) ? state.graphData.links.filter((l) => {
           const source = typeof l.source === 'string' ? l.source : l.source.id;
           const target = typeof l.target === 'string' ? l.target : l.target.id;
           return !(source === sourceId && target === targetId);
-        }),
+        }) : [],
       },
     })),
 
@@ -107,6 +107,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const { graphData } = get();
     const neighborNodes = new Set<string>();
     const neighborLinks = new Set<string>();
+
+    if (!Array.isArray(graphData?.links)) {
+      return { nodes: neighborNodes, links: neighborLinks };
+    }
 
     graphData.links.forEach((link) => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source.id;

@@ -35,6 +35,7 @@ export default function Graph3D({
   const [webGLSupported, setWebGLSupported] = useState(true);
   const [renderError, setRenderError] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [isOverviewActive, setIsOverviewActive] = useState(false);
 
   const {
     graphData,
@@ -68,6 +69,11 @@ export default function Graph3D({
   }, []);
 
   const filteredData = useMemo(() => {
+    // Ensure graphData is properly initialized
+    if (!graphData || !Array.isArray(graphData.nodes) || !Array.isArray(graphData.links)) {
+      return { nodes: [], links: [] };
+    }
+    
     let nodes = graphData.nodes;
     let links = graphData.links;
 
@@ -143,36 +149,155 @@ export default function Graph3D({
     setSelectedNode(null);
   }, [setSelectedNode]);
 
+  // Overview animation system
+  const startOverviewAnimation = useCallback(() => {
+    if (!graphRef.current || !graphData.nodes.length || isOverviewActive) return;
+    
+    setIsOverviewActive(true);
+    const nodes = graphData.nodes;
+    
+    // Create a smooth path through the nodes
+    const createSmoothPath = (nodes: any[]) => {
+      const path = [];
+      const visited = new Set();
+      
+      // Start with a random node
+      let currentNode = nodes[Math.floor(Math.random() * nodes.length)];
+      path.push(currentNode);
+      visited.add(currentNode.id);
+      
+      // Create a path that visits different types of nodes
+      const nodeTypes = ['person', 'event', 'location'];
+      let currentTypeIndex = 0;
+      
+      for (let i = 0; i < Math.min(15, nodes.length); i++) {
+        // Find nodes of the current type that haven't been visited
+        const availableNodes = nodes.filter(node => 
+          node.type === nodeTypes[currentTypeIndex] && !visited.has(node.id)
+        );
+        
+        if (availableNodes.length > 0) {
+          currentNode = availableNodes[Math.floor(Math.random() * availableNodes.length)];
+          path.push(currentNode);
+          visited.add(currentNode.id);
+        }
+        
+        // Move to next type
+        currentTypeIndex = (currentTypeIndex + 1) % nodeTypes.length;
+      }
+      
+      return path;
+    };
+    
+    const path = createSmoothPath(nodes);
+    let currentIndex = 0;
+    
+    const animateToNextNode = () => {
+      if (currentIndex >= path.length) {
+        // Animation complete
+        setIsOverviewActive(false);
+        return;
+      }
+      
+      const node = path[currentIndex];
+      const nextNode = path[currentIndex + 1];
+      
+      if (graphRef.current) {
+        // Create rollercoaster-like movement
+        const distance = 80 + Math.random() * 40; // Vary distance
+        const distRatio = 1 + distance / Math.hypot(node.x || 0, node.y || 0, node.z || 0);
+        
+        // Add some randomness for rollercoaster effect
+        const randomOffset = {
+          x: (Math.random() - 0.5) * 20,
+          y: (Math.random() - 0.5) * 20,
+          z: (Math.random() - 0.5) * 20
+        };
+        
+        const targetPosition = {
+          x: (node.x || 0) * distRatio + randomOffset.x,
+          y: (node.y || 0) * distRatio + randomOffset.y,
+          z: (node.z || 0) * distRatio + randomOffset.z
+        };
+        
+        // Smooth camera movement with easing
+        graphRef.current.cameraPosition(
+          targetPosition,
+          node,
+          800 + Math.random() * 400 // Vary duration for natural feel
+        );
+        
+        // Highlight the current node
+        setSelectedNode(node);
+        
+        currentIndex++;
+        
+        // Schedule next animation
+        setTimeout(animateToNextNode, 1000 + Math.random() * 500);
+      }
+    };
+    
+    // Start the animation
+    setTimeout(animateToNextNode, 500);
+  }, [graphData.nodes, isOverviewActive, setSelectedNode]);
+  
+  // Listen for overview start event
+  useEffect(() => {
+    const handleOverviewStart = () => {
+      startOverviewAnimation();
+    };
+    
+    window.addEventListener('startOverview', handleOverviewStart);
+    return () => window.removeEventListener('startOverview', handleOverviewStart);
+  }, [startOverviewAnimation]);
+
   const nodeThreeObject = useCallback((node: any) => {
     try {
       const nodeColor = node.color || NODE_COLORS[node.type as NodeType];
       const group = new THREE.Group();
-      const nodeSize = node.val || 6;
+      const nodeSize = (node.val || 6) * 2.5; // Make nodes 2.5x bigger (thick balls)
       const isSelected = hoveredNode === node || selectedNode === node;
+      const isOverviewTarget = isOverviewActive && selectedNode === node;
 
       // Create outer glow layers first (so they render behind the main sphere)
-      if (isSelected) {
+      if (isSelected || isOverviewTarget) {
+        // Enhanced glow for overview animation
+        const glowMultiplier = isOverviewTarget ? 2 : 1;
+        
         // Outer glow
-        const outerGlowGeometry = new THREE.SphereGeometry(nodeSize * 4, 16, 16);
+        const outerGlowGeometry = new THREE.SphereGeometry(nodeSize * 4 * glowMultiplier, 16, 16);
         const outerGlowMaterial = new THREE.MeshBasicMaterial({
           color: nodeColor,
           transparent: true,
-          opacity: 0.1,
+          opacity: isOverviewTarget ? 0.3 : 0.1,
           depthWrite: false,
         });
         const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
         group.add(outerGlow);
 
         // Middle glow
-        const middleGlowGeometry = new THREE.SphereGeometry(nodeSize * 2.5, 16, 16);
+        const middleGlowGeometry = new THREE.SphereGeometry(nodeSize * 2.5 * glowMultiplier, 16, 16);
         const middleGlowMaterial = new THREE.MeshBasicMaterial({
           color: nodeColor,
           transparent: true,
-          opacity: 0.2,
+          opacity: isOverviewTarget ? 0.4 : 0.2,
           depthWrite: false,
         });
         const middleGlow = new THREE.Mesh(middleGlowGeometry, middleGlowMaterial);
         group.add(middleGlow);
+        
+        // Extra glow for overview targets
+        if (isOverviewTarget) {
+          const extraGlowGeometry = new THREE.SphereGeometry(nodeSize * 6, 16, 16);
+          const extraGlowMaterial = new THREE.MeshBasicMaterial({
+            color: nodeColor,
+            transparent: true,
+            opacity: 0.15,
+            depthWrite: false,
+          });
+          const extraGlow = new THREE.Mesh(extraGlowGeometry, extraGlowMaterial);
+          group.add(extraGlow);
+        }
       }
 
       // Inner glow for all nodes
@@ -187,11 +312,11 @@ export default function Graph3D({
       group.add(innerGlow);
 
       // Main sphere - make it more emissive for better bloom effect
-      const geometry = new THREE.SphereGeometry(nodeSize, 16, 16);
+      const geometry = new THREE.SphereGeometry(nodeSize * (isOverviewTarget ? 1.5 : 1), 16, 16);
       const material = new THREE.MeshPhongMaterial({
         color: nodeColor,
         emissive: nodeColor,
-        emissiveIntensity: isSelected ? 2.0 : 1.5,
+        emissiveIntensity: isOverviewTarget ? 3.0 : (isSelected ? 2.0 : 1.5),
         shininess: 10,
         transparent: true,
         opacity: highlightedNodes.size > 0
@@ -205,10 +330,10 @@ export default function Graph3D({
       const sprite = new SpriteText(node.name);
       sprite.material.depthWrite = false;
       sprite.color = '#ffffff';
-      sprite.textHeight = 3;
-      sprite.position.y = nodeSize + 8;
-      sprite.backgroundColor = 'rgba(0,0,0,0.5)';
-      sprite.padding = 2;
+      sprite.textHeight = isOverviewTarget ? 4 : 3;
+      sprite.position.y = (nodeSize * (isOverviewTarget ? 1.5 : 1)) + 8;
+      sprite.backgroundColor = isOverviewTarget ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)';
+      sprite.padding = isOverviewTarget ? 3 : 2;
       sprite.borderRadius = 2;
       group.add(sprite);
 
@@ -219,7 +344,7 @@ export default function Graph3D({
       const material = new THREE.MeshBasicMaterial({ color: 0x3B82F6 });
       return new THREE.Mesh(geometry, material);
     }
-  }, [highlightedNodes, hoveredNode, selectedNode]);
+  }, [highlightedNodes, hoveredNode, selectedNode, isOverviewActive]);
 
   const linkColor = useCallback((link: any) => {
     const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
@@ -306,9 +431,19 @@ export default function Graph3D({
     );
   }
 
-  return (
-    <div className="relative w-full h-full">
-      <ForceGraph3D
+      return (
+        <div className="relative w-full h-full">
+          {/* Overview Animation Overlay */}
+          {isOverviewActive && (
+            <div className="absolute top-4 right-4 z-20 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg shadow-lg animate-pulse">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                <span className="text-sm font-medium">Neural Journey in Progress...</span>
+              </div>
+            </div>
+          )}
+          
+          <ForceGraph3D
         ref={graphRef}
         width={width}
         height={height}
@@ -316,7 +451,7 @@ export default function Graph3D({
         backgroundColor={backgroundColor}
         nodeLabel="name"
         nodeRelSize={1}
-        nodeVal={(node: any) => node.val || 6}
+            nodeVal={(node: any) => (node.val || 6) * 2.5}
         nodeColor={(node: any) => node.color || NODE_COLORS[node.type as NodeType]}
         nodeOpacity={0.9}
         nodeResolution={8}

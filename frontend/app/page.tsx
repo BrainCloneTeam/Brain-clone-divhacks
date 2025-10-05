@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
+import { Play, Plus, MessageCircle } from 'lucide-react';
 import { useGraphStore } from '@/stores/graphStore';
 import { graphApi } from '@/lib/api';
 
@@ -16,9 +17,16 @@ const Graph3D = dynamic(() => import('@/components/Graph3D'), {
 });
 
 export default function Home() {
-  const { searchQuery, setSearchQuery, filterByType, setFilterByType, setGraphData, setLoading, setError, isLoading } = useGraphStore();
+  const { searchQuery, setSearchQuery, filterByType, setFilterByType, setGraphData, setLoading, setError, isLoading, graphData } = useGraphStore();
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [appLoaded, setAppLoaded] = useState(false);
+  const [showJournaling, setShowJournaling] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [journalText, setJournalText] = useState('');
+  const [isProcessingJournal, setIsProcessingJournal] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<Array<{role: 'user' | 'assistant', message: string, timestamp: string}>>([]);
+  const [isProcessingChat, setIsProcessingChat] = useState(false);
 
   useEffect(() => {
     const loadGraphData = async () => {
@@ -39,6 +47,166 @@ export default function Home() {
 
     loadGraphData();
   }, [setGraphData, setLoading, setError]);
+
+  const handleJournalSubmit = async () => {
+    if (!journalText.trim()) return;
+    
+    setIsProcessingJournal(true);
+    try {
+      // Call API to process journal entry with Gemini
+      const response = await fetch('/api/journal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: journalText,
+          graphData: graphData
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process journal entry');
+      }
+
+      const result = await response.json();
+      console.log('Journal analysis:', result.analysis);
+      
+      // Add analyzed entities to the graph
+      if (result.analysis && result.analysis.entities) {
+        const analysis = result.analysis;
+        const entities = analysis.entities;
+        
+        // Safely extract entities with proper null checks
+        const people = Array.isArray(entities.people) ? entities.people : [];
+        const places = Array.isArray(entities.places) ? entities.places : [];
+        const events = Array.isArray(entities.events) ? entities.events : [];
+        
+        // Add entities as nodes
+        const entitiesToAdd = [
+          ...people.map((person: string) => ({
+            id: `person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: person,
+            type: 'person' as const,
+            group: 1
+          })),
+          ...places.map((place: string) => ({
+            id: `place_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: place,
+            type: 'location' as const,
+            group: 2
+          })),
+          ...events.map((event: string) => ({
+            id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: event,
+            type: 'event' as const,
+            group: 3
+          }))
+        ];
+        
+        // Add nodes to current graph data with proper initialization
+        setGraphData(prevData => {
+          const currentNodes = Array.isArray(prevData?.nodes) ? prevData.nodes : [];
+          return {
+            ...prevData,
+            nodes: [...currentNodes, ...entitiesToAdd],
+            links: Array.isArray(prevData?.links) ? prevData.links : []
+          };
+        });
+        
+        console.log('Added entities to graph:', entitiesToAdd);
+      }
+      
+      // Clear the input
+      setJournalText('');
+      setShowJournaling(false);
+      
+    } catch (error) {
+      console.error('Failed to process journal entry:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process journal entry';
+      
+      // Show user-friendly error message
+      if (errorMessage.includes('quota')) {
+        setError('AI analysis is temporarily unavailable due to quota limits. Please try again later or contact support.');
+      } else {
+        setError(errorMessage);
+      }
+    } finally {
+      setIsProcessingJournal(false);
+    }
+  };
+
+  const handleChatSubmit = async () => {
+    if (!chatMessage.trim()) return;
+    
+    const userMessage = chatMessage.trim();
+    setChatMessage('');
+    setIsProcessingChat(true);
+    
+    // Add user message to history
+    const newHistory = [...chatHistory, {
+      role: 'user' as const,
+      message: userMessage,
+      timestamp: new Date().toISOString()
+    }];
+    setChatHistory(newHistory);
+    
+    try {
+      console.log('Sending chat request:', { 
+        message: userMessage, 
+        graphData: graphData, 
+        chatHistory: newHistory,
+        graphDataType: typeof graphData,
+        chatHistoryType: typeof newHistory,
+        graphDataKeys: graphData ? Object.keys(graphData) : 'null',
+        chatHistoryLength: newHistory ? newHistory.length : 'null'
+      });
+      
+      // Call chat API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          graphData: graphData,
+          chatHistory: newHistory
+        }),
+      });
+
+      console.log('Chat response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Chat API error response:', errorText);
+        throw new Error(`Failed to process chat message: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Chat API success:', result);
+      
+      // Add AI response to history
+      setChatHistory([...newHistory, {
+        role: 'assistant' as const,
+        message: result.response,
+        timestamp: result.timestamp
+      }]);
+      
+    } catch (error) {
+      console.error('Failed to process chat message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process chat message';
+      
+      // Add user message to history even if API fails
+      setChatHistory([...newHistory, {
+        role: 'assistant' as const,
+        message: `Sorry, I'm currently unable to respond. Error: ${errorMessage}`,
+        timestamp: new Date().toISOString()
+      }]);
+    } finally {
+      setIsProcessingChat(false);
+    }
+  };
 
   // Show splash screen while loading
   if (!appLoaded) {
@@ -113,7 +281,7 @@ export default function Home() {
         </div>
 
         {/* Filter by Type */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-3">
           <button
             onClick={() => setFilterByType(null)}
             className={`px-3 py-1 rounded-lg transition-colors ${
@@ -147,7 +315,138 @@ export default function Home() {
             Locations
           </button>
         </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-2">
+          {/* Play Button */}
+          <button
+            onClick={() => {
+              const event = new CustomEvent('startOverview');
+              window.dispatchEvent(event);
+            }}
+            className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+          >
+            <Play className="w-5 h-5" />
+          </button>
+
+          {/* Journal Button */}
+          <button
+            onClick={() => setShowJournaling(!showJournaling)}
+            className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="text-sm">Add Memory</span>
+          </button>
+
+          {/* Chat Button */}
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className="w-full px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span className="text-sm">Ask AI</span>
+          </button>
+        </div>
       </div>
+
+      {/* Journaling Panel */}
+      {showJournaling && (
+        <div className="absolute top-4 right-4 z-10 bg-gray-800/90 backdrop-blur-sm rounded-lg p-4 shadow-xl max-w-md">
+          <h3 className="text-lg font-semibold text-white mb-3">Add Memory</h3>
+          <textarea
+            value={journalText}
+            onChange={(e) => setJournalText(e.target.value)}
+            placeholder="Describe your day, thoughts, experiences... AI will connect it to your knowledge graph!"
+            className="w-full h-32 px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+          />
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={handleJournalSubmit}
+              disabled={!journalText.trim() || isProcessingJournal}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isProcessingJournal ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span>Add to Brain</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setShowJournaling(false)}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chat Panel */}
+      {showChat && (
+        <div className="absolute bottom-4 right-4 z-10 bg-gray-800/90 backdrop-blur-sm rounded-lg p-4 shadow-xl max-w-md h-96 flex flex-col">
+          <h3 className="text-lg font-semibold text-white mb-3">Ask Your Brain</h3>
+          <div className="bg-gray-700 rounded-lg p-3 mb-3 flex-1 overflow-y-auto">
+            {chatHistory.length === 0 ? (
+              <p className="text-gray-300 text-sm">Ask me anything about your memories, experiences, or insights from your knowledge graph!</p>
+            ) : (
+              <div className="space-y-3">
+                {chatHistory.map((msg, index) => (
+                  <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] p-2 rounded-lg ${
+                      msg.role === 'user' 
+                        ? 'bg-orange-600 text-white' 
+                        : 'bg-gray-600 text-gray-100'
+                    }`}>
+                      <p className="text-sm">{msg.message}</p>
+                    </div>
+                  </div>
+                ))}
+                {isProcessingChat && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-600 text-gray-100 p-2 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatMessage}
+              onChange={(e) => setChatMessage(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleChatSubmit()}
+              placeholder="Ask about your memories..."
+              className="flex-1 px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              disabled={isProcessingChat}
+            />
+            <button 
+              onClick={handleChatSubmit}
+              disabled={!chatMessage.trim() || isProcessingChat}
+              className="px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MessageCircle className="w-4 h-4" />
+            </button>
+          </div>
+          <button
+            onClick={() => setShowChat(false)}
+            className="mt-2 w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+          >
+            Close Chat
+          </button>
+        </div>
+      )}
 
       {/* Selected Node Info */}
       <SelectedNodeInfo />
