@@ -105,13 +105,12 @@ export default function Home() {
         ];
         
         // Add nodes to current graph data with proper initialization
-        setGraphData((prevData: any) => {
-          const currentNodes = Array.isArray(prevData?.nodes) ? prevData.nodes : [];
-          return {
-            ...prevData,
-            nodes: [...currentNodes, ...entitiesToAdd],
-            links: Array.isArray(prevData?.links) ? prevData.links : []
-          };
+        const currentNodes = Array.isArray(graphData?.nodes) ? graphData.nodes : [];
+        const currentLinks = Array.isArray(graphData?.links) ? graphData.links : [];
+        
+        setGraphData({
+          nodes: [...currentNodes, ...entitiesToAdd],
+          links: currentLinks
         });
         
         console.log('Added entities to graph:', entitiesToAdd);
