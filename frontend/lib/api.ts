@@ -55,10 +55,37 @@ const GraphDataSchema = z.object({
   links: z.array(GraphLinkSchema),
 });
 
+// Demo data for when backend is not available
+const DEMO_GRAPH_DATA: GraphData = {
+  nodes: [
+    { id: "sarah", name: "Sarah Chen", type: "person", val: 1, color: NODE_COLORS.person, metadata: { description: "College roommate and best friend", category: "Person" } },
+    { id: "alex", name: "Alex Kim", type: "person", val: 1, color: NODE_COLORS.person, metadata: { description: "Study partner and CS lab partner", category: "Person" } },
+    { id: "stanford", name: "Stanford University", type: "location", val: 1, color: NODE_COLORS.location, metadata: { description: "Alma mater where I studied computer science", category: "Location" } },
+    { id: "graduation", name: "College Graduation", type: "event", val: 1, color: NODE_COLORS.event, metadata: { description: "Proud moment walking across the stage", category: "Event" } },
+    { id: "mike", name: "Mike Rodriguez", type: "person", val: 1, color: NODE_COLORS.person, metadata: { description: "High school friend and hiking buddy", category: "Person" } },
+    { id: "yosemite", name: "Yosemite National Park", type: "location", val: 1, color: NODE_COLORS.location, metadata: { description: "Breathtaking national park with granite cliffs and waterfalls", category: "Location" } },
+    { id: "hike", name: "Half Dome Hike", type: "event", val: 1, color: NODE_COLORS.event, metadata: { description: "Challenging 16-mile hike to the top of Half Dome", category: "Event" } },
+    { id: "grandma", name: "Grandma Rose", type: "person", val: 1, color: NODE_COLORS.person, metadata: { description: "Beloved grandmother who taught me to cook", category: "Person" } },
+    { id: "family_home", name: "Family Home", type: "location", val: 1, color: NODE_COLORS.location, metadata: { description: "Childhood home in Chicago suburbs", category: "Location" } },
+    { id: "recipes", name: "Learning Grandma's Recipes", type: "event", val: 1, color: NODE_COLORS.event, metadata: { description: "Special time learning family recipes and stories", category: "Event" } },
+  ],
+  links: [
+    { source: "sarah", target: "graduation", relationship: "ATTENDED", strength: 1 },
+    { source: "alex", target: "stanford", relationship: "STUDIED_AT", strength: 1 },
+    { source: "graduation", target: "stanford", relationship: "OCCURRED_AT", strength: 1 },
+    { source: "mike", target: "hike", relationship: "HIKED_WITH", strength: 1 },
+    { source: "hike", target: "yosemite", relationship: "OCCURRED_AT", strength: 1 },
+    { source: "grandma", target: "recipes", relationship: "TAUGHT", strength: 1 },
+    { source: "recipes", target: "family_home", relationship: "OCCURRED_AT", strength: 1 },
+    { source: "sarah", target: "alex", relationship: "INTRODUCED_TO", strength: 1 },
+    { source: "grandma", target: "sarah", relationship: "MET", strength: 1 },
+  ]
+};
+
 export const graphApi = {
   async getGraph(): Promise<GraphData> {
     try {
-      // Fetch all nodes and relationships from Neo4j
+      // Try to fetch from backend first
       const response = await api.post('/graph/cypher?query=' + encodeURIComponent('MATCH (n) OPTIONAL MATCH (n)-[r]-(m) RETURN DISTINCT n, r, m LIMIT 500'));
 
       const nodes = new Map<string, GraphNode>();
@@ -130,49 +157,109 @@ export const graphApi = {
         links: links,
       };
     } catch (error) {
-      console.error('Error fetching graph data:', error);
-      return { nodes: [], links: [] };
+      console.warn('Backend not available, using demo data:', error);
+      // Return demo data when backend is not available (e.g., on Vercel)
+      return DEMO_GRAPH_DATA;
     }
   },
 
   async getNode(nodeId: string): Promise<GraphNode> {
-    const response = await api.get(`/graph/nodes/${nodeId}`);
-    return GraphNodeSchema.parse(response.data);
+    try {
+      const response = await api.get(`/graph/nodes/${nodeId}`);
+      return GraphNodeSchema.parse(response.data);
+    } catch (error) {
+      // Return demo node if backend not available
+      const demoNode = DEMO_GRAPH_DATA.nodes.find(n => n.id === nodeId);
+      if (demoNode) return demoNode;
+      throw new Error('Node not found');
+    }
   },
 
   async createNode(node: Omit<GraphNode, 'id'>): Promise<GraphNode> {
-    const response = await api.post('/graph/nodes', node);
-    return GraphNodeSchema.parse(response.data);
+    try {
+      const response = await api.post('/graph/nodes', node);
+      return GraphNodeSchema.parse(response.data);
+    } catch (error) {
+      // In demo mode, just return the node with a generated ID
+      return { ...node, id: `demo_${Date.now()}` };
+    }
   },
 
   async updateNode(nodeId: string, updates: Partial<GraphNode>): Promise<GraphNode> {
-    const response = await api.patch(`/graph/nodes/${nodeId}`, updates);
-    return GraphNodeSchema.parse(response.data);
+    try {
+      const response = await api.patch(`/graph/nodes/${nodeId}`, updates);
+      return GraphNodeSchema.parse(response.data);
+    } catch (error) {
+      // In demo mode, return updated node
+      const demoNode = DEMO_GRAPH_DATA.nodes.find(n => n.id === nodeId);
+      if (demoNode) return { ...demoNode, ...updates };
+      throw new Error('Node not found');
+    }
   },
 
   async deleteNode(nodeId: string): Promise<void> {
-    await api.delete(`/graph/nodes/${nodeId}`);
+    try {
+      await api.delete(`/graph/nodes/${nodeId}`);
+    } catch (error) {
+      // In demo mode, just log the action
+      console.log('Demo mode: Would delete node', nodeId);
+    }
   },
 
   async createLink(link: Omit<GraphLink, 'color'>): Promise<GraphLink> {
-    const response = await api.post('/graph/links', link);
-    return GraphLinkSchema.parse(response.data);
+    try {
+      const response = await api.post('/graph/links', link);
+      return GraphLinkSchema.parse(response.data);
+    } catch (error) {
+      // In demo mode, just return the link
+      return { ...link, color: '#666' };
+    }
   },
 
   async deleteLink(sourceId: string, targetId: string): Promise<void> {
-    await api.delete(`/graph/links/${sourceId}/${targetId}`);
+    try {
+      await api.delete(`/graph/links/${sourceId}/${targetId}`);
+    } catch (error) {
+      // In demo mode, just log the action
+      console.log('Demo mode: Would delete link', sourceId, targetId);
+    }
   },
 
   async searchNodes(query: string): Promise<GraphNode[]> {
-    const response = await api.get('/graph/search', { params: { q: query } });
-    return z.array(GraphNodeSchema).parse(response.data);
+    try {
+      const response = await api.get('/graph/search', { params: { q: query } });
+      return z.array(GraphNodeSchema).parse(response.data);
+    } catch (error) {
+      // In demo mode, filter demo nodes
+      return DEMO_GRAPH_DATA.nodes.filter(node => 
+        node.name.toLowerCase().includes(query.toLowerCase()) ||
+        node.metadata?.description?.toLowerCase().includes(query.toLowerCase())
+      );
+    }
   },
 
   async getNeighbors(nodeId: string, depth: number = 1): Promise<GraphData> {
-    const response = await api.get(`/graph/nodes/${nodeId}/neighbors`, {
-      params: { depth },
-    });
-    return GraphDataSchema.parse(response.data);
+    try {
+      const response = await api.get(`/graph/nodes/${nodeId}/neighbors`, {
+        params: { depth },
+      });
+      return GraphDataSchema.parse(response.data);
+    } catch (error) {
+      // In demo mode, find neighbors from demo data
+      const neighbors = DEMO_GRAPH_DATA.links
+        .filter(link => link.source === nodeId || link.target === nodeId)
+        .map(link => link.source === nodeId ? link.target : link.source);
+      
+      const neighborNodes = DEMO_GRAPH_DATA.nodes.filter(node => 
+        neighbors.includes(node.id) || node.id === nodeId
+      );
+      
+      const neighborLinks = DEMO_GRAPH_DATA.links.filter(link =>
+        neighborNodes.some(node => node.id === link.source || node.id === link.target)
+      );
+
+      return { nodes: neighborNodes, links: neighborLinks };
+    }
   },
 };
 
