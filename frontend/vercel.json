@@ -1,12 +1,16 @@
 {
+  "version": 2,
+  "framework": "nextjs",
   "buildCommand": "pnpm build",
   "outputDirectory": ".next",
   "installCommand": "pnpm install",
-  "framework": "nextjs",
   "regions": ["iad1"],
   "functions": {
     "app/api/*": {
       "maxDuration": 30
     }
+  },
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://your-backend-url.com/api/v1"
   }
 }

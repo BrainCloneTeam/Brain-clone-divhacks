@@ -1,0 +1,15 @@
+{
+  "name": "brain3-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BRAIN3 - AI-powered knowledge graph for bringing your memories to life",
+  "scripts": {
+    "dev": "cd frontend && pnpm dev",
+    "build": "cd frontend && pnpm build",
+    "start": "cd frontend && pnpm start",
+    "install": "cd frontend && pnpm install"
+  },
+  "workspaces": [
+    "frontend"
+  ]
+}
