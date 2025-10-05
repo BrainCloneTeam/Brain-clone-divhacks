@@ -2,7 +2,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import { GraphData, GraphNode, GraphLink, NODE_COLORS, NodeType } from '@/types/graph';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zaida-unvitreous-indiscriminatingly.ngrok-free.dev/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -85,98 +85,64 @@ const DEMO_GRAPH_DATA: GraphData = {
 export const graphApi = {
   async getGraph(): Promise<GraphData> {
     try {
-      // Use the visualize endpoint to get graph data
-      const response = await api.post('/graph/visualize', {
-        include_metadata: true,
-        max_nodes: 1000
-      });
-
-      if (response.data && response.data.nodes && response.data.links) {
-        // Transform backend data to frontend format
-        const nodes: GraphNode[] = response.data.nodes.map((node: any) => ({
-          id: node.id || node.name,
-          name: node.name,
-          type: (node.type || node.category || 'event').toLowerCase() as NodeType,
-          val: node.val || 5,
-          color: node.color || NODE_COLORS[(node.type || 'event').toLowerCase() as NodeType] || '#666666',
-          metadata: {
-            description: node.description,
-            category: node.category,
-            ...node.metadata
-          }
-        }));
-
-        const links: GraphLink[] = response.data.links.map((link: any) => ({
-          source: link.source,
-          target: link.target,
-          relationship: link.relationship || link.type || 'RELATED_TO',
-          strength: link.strength || 1,
-          color: link.color || '#94A3B8'
-        }));
-
-        console.log('Loaded graph from backend:', nodes.length, 'nodes,', links.length, 'links');
-        return { nodes, links };
-      }
-
-      // Fallback: try Cypher query if visualize endpoint doesn't work
-      const cypherResponse = await api.post('/graph/cypher', {
-        query: 'MATCH (n) OPTIONAL MATCH (n)-[r]-(m) RETURN DISTINCT n, r, m LIMIT 500'
-      });
+      // Try to fetch from backend first
+      const response = await api.post('/graph/cypher?query=' + encodeURIComponent('MATCH (n) OPTIONAL MATCH (n)-[r]-(m) RETURN DISTINCT n, r, m LIMIT 500'));
 
       const nodes = new Map<string, GraphNode>();
       const links: GraphLink[] = [];
-      const linkSet = new Set<string>();
+      const linkSet = new Set<string>(); // To avoid duplicate links
 
-      if (cypherResponse.data && cypherResponse.data.results) {
-        cypherResponse.data.results.forEach((record: any) => {
+      // Process results
+      if (response.data.results) {
+        response.data.results.forEach((record: any) => {
           // Add nodes
-          if (record.n && !nodes.has(record.n.id || record.n.name)) {
-            const nodeType = (record.n.type === 'Event' ? 'event' :
-                             record.n.type === 'Location' ? 'location' :
-                             record.n.type === 'Person' ? 'person' : 'event') as NodeType;
+          if (record.n && !nodes.has(record.n.name)) {
+            const nodeType = (record.n.category === 'Event' ? 'event' :
+                             record.n.category === 'Date' ? 'event' :
+                             record.n.category === 'Location' ? 'location' :
+                             record.n.category === 'Person' ? 'person' : 'event') as NodeType;
 
-            nodes.set(record.n.id || record.n.name, {
-              id: record.n.id || record.n.name,
+            nodes.set(record.n.name, {
+              id: record.n.name,
               name: record.n.name,
               type: nodeType,
-              val: 5,
+              val: 1,
               color: NODE_COLORS[nodeType],
               metadata: {
                 description: record.n.description,
-                category: record.n.type,
+                category: record.n.category,
               },
             });
           }
 
-          if (record.m && !nodes.has(record.m.id || record.m.name)) {
-            const nodeType = (record.m.type === 'Event' ? 'event' :
-                             record.m.type === 'Location' ? 'location' :
-                             record.m.type === 'Person' ? 'person' : 'event') as NodeType;
+          if (record.m && !nodes.has(record.m.name)) {
+            const nodeType = (record.m.category === 'Event' ? 'event' :
+                             record.m.category === 'Date' ? 'event' :
+                             record.m.category === 'Location' ? 'location' :
+                             record.m.category === 'Person' ? 'person' : 'event') as NodeType;
 
-            nodes.set(record.m.id || record.m.name, {
-              id: record.m.id || record.m.name,
+            nodes.set(record.m.name, {
+              id: record.m.name,
               name: record.m.name,
               type: nodeType,
-              val: 5,
+              val: 1,
               color: NODE_COLORS[nodeType],
               metadata: {
                 description: record.m.description,
-                category: record.m.type,
+                category: record.m.category,
               },
             });
           }
 
           // Add relationships as links
           if (record.r && record.n && record.m) {
-            const sourceId = record.n.id || record.n.name;
-            const targetId = record.m.id || record.m.name;
-            const linkId = `${sourceId}-${targetId}`;
-            const reverseLinkId = `${targetId}-${sourceId}`;
+            const linkId = `${record.n.name}-${record.m.name}`;
+            const reverseLinkId = `${record.m.name}-${record.n.name}`;
 
             if (!linkSet.has(linkId) && !linkSet.has(reverseLinkId)) {
               links.push({
-                source: sourceId,
-                target: targetId,
+                source: record.n.name,
+                target: record.m.name,
                 relationship: record.r.type || 'RELATED_TO',
                 strength: 1,
               });
@@ -192,6 +158,7 @@ export const graphApi = {
       };
     } catch (error) {
       console.warn('Backend not available, using demo data:', error);
+      // Return demo data when backend is not available (e.g., on Vercel)
       return DEMO_GRAPH_DATA;
     }
   },
@@ -210,31 +177,11 @@ export const graphApi = {
 
   async createNode(node: Omit<GraphNode, 'id'>): Promise<GraphNode> {
     try {
-      // Use the entities endpoint to create a new entity
-      const entityData = {
-        name: node.name,
-        type: node.type.toUpperCase(), // Backend expects uppercase
-        description: node.metadata?.description || '',
-        confidence_score: 0.9,
-        metadata: node.metadata || {}
-      };
-
-      const response = await api.post('/graph/entities', entityData);
-      
-      // Return the created node with backend ID
-      return {
-        ...node,
-        id: response.data.entity_id || `entity_${Date.now()}`,
-        metadata: {
-          ...node.metadata,
-          entity_id: response.data.entity_id,
-          backend_created: true
-        }
-      };
+      const response = await api.post('/graph/nodes', node);
+      return GraphNodeSchema.parse(response.data);
     } catch (error) {
-      console.warn('Failed to create entity in backend:', error);
-      // Fallback: return node with generated ID
-      return { ...node, id: `local_${Date.now()}` };
+      // In demo mode, just return the node with a generated ID
+      return { ...node, id: `demo_${Date.now()}` };
     }
   },
 
@@ -261,24 +208,10 @@ export const graphApi = {
 
   async createLink(link: Omit<GraphLink, 'color'>): Promise<GraphLink> {
     try {
-      // Use the relationships endpoint to create a relationship
-      const relationshipData = {
-        source_entity_id: link.source,
-        target_entity_id: link.target,
-        relationship_type: link.relationship,
-        strength: link.strength || 1.0,
-        metadata: {}
-      };
-
-      const response = await api.post('/graph/relationships', relationshipData);
-      
-      return {
-        ...link,
-        color: '#94A3B8'
-      };
+      const response = await api.post('/graph/links', link);
+      return GraphLinkSchema.parse(response.data);
     } catch (error) {
-      console.warn('Failed to create relationship in backend:', error);
-      // Fallback: return link with default color
+      // In demo mode, just return the link
       return { ...link, color: '#666' };
     }
   },
@@ -294,33 +227,10 @@ export const graphApi = {
 
   async searchNodes(query: string): Promise<GraphNode[]> {
     try {
-      // Use the search entities endpoint
-      const response = await api.post('/graph/search/entities', {
-        query: query,
-        limit: 50,
-        include_metadata: true
-      });
-
-      if (response.data && response.data.entities) {
-        return response.data.entities.map((entity: any) => ({
-          id: entity.id || entity.name,
-          name: entity.name,
-          type: (entity.type || 'event').toLowerCase() as NodeType,
-          val: 5,
-          color: NODE_COLORS[(entity.type || 'event').toLowerCase() as NodeType] || '#666666',
-          metadata: {
-            description: entity.description,
-            category: entity.type,
-            confidence: entity.confidence_score,
-            ...entity.metadata
-          }
-        }));
-      }
-
-      return [];
+      const response = await api.get('/graph/search', { params: { q: query } });
+      return z.array(GraphNodeSchema).parse(response.data);
     } catch (error) {
-      console.warn('Search failed, using local filter:', error);
-      // Fallback: filter demo nodes
+      // In demo mode, filter demo nodes
       return DEMO_GRAPH_DATA.nodes.filter(node => 
         node.name.toLowerCase().includes(query.toLowerCase()) ||
         node.metadata?.description?.toLowerCase().includes(query.toLowerCase())
