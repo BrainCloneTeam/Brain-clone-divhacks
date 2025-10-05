@@ -105,7 +105,7 @@ export default function Home() {
         ];
         
         // Add nodes to current graph data with proper initialization
-        setGraphData(prevData => {
+        setGraphData((prevData: any) => {
           const currentNodes = Array.isArray(prevData?.nodes) ? prevData.nodes : [];
           return {
             ...prevData,
