@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Calling Gemini service with:', { message, graphData, chatHistory });
+    console.log('Calling Gemini service with :', { message, graphData, chatHistory });
     
     // Get response from Gemini with full context
     const response = await geminiService.chatWithContext(message, graphData, chatHistory);
