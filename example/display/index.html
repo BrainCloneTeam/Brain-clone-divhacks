@@ -1,0 +1,131 @@
+<head>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        #graph {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "react": "https://esm.sh/react@18",
+                "react-dom": "https://esm.sh/react-dom@18/client"
+            }
+        }
+    </script>
+</head>
+
+<body>
+<div id="graph"></div>
+
+<script src="//cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel" data-type="module">
+    import ForceGraph3D from 'https://esm.sh/react-force-graph-3d?external=react';
+    import React, {useRef, useEffect, useCallback, useState, useMemo} from 'react';
+    import {createRoot} from 'react-dom';
+    import {UnrealBloomPass} from 'https://esm.sh/three/examples/jsm/postprocessing/UnrealBloomPass.js';
+    import SpriteText from "https://esm.sh/three-spritetext";
+
+    fetch('../datasets/people_events_locations.json').then(res => res.json()).then(data => {
+        const FocusGraph = () => {
+            const fgRef = useRef();
+            const [selectedNode, setSelectedNode] = useState(null);
+
+            useEffect(() => {
+                const bloomPass = new UnrealBloomPass();
+                bloomPass.strength = 2;
+                bloomPass.radius = 1;
+                bloomPass.threshold = 0.3;
+                fgRef.current.postProcessingComposer().addPass(bloomPass);
+            }, []);
+
+            // Filter graph data based on selected node
+            const filteredData = useMemo(() => {
+                if (!selectedNode) return data;
+
+                // Find all nodes connected to the selected node
+                const connectedNodeIds = new Set([selectedNode.id]);
+
+                // Find all links connected to the selected node
+                const connectedLinks = data.links.filter(link =>
+                    link.source.id === selectedNode.id || link.source === selectedNode.id ||
+                    link.target.id === selectedNode.id || link.target === selectedNode.id ||
+                    (link.target.group == link.source.group && link.target.group == 5)
+                );
+
+                // Add connected nodes to the set
+                connectedLinks.forEach(link => {
+                    connectedNodeIds.add(typeof link.source === 'object' ? link.source.id : link.source);
+                    connectedNodeIds.add(typeof link.target === 'object' ? link.target.id : link.target);
+                });
+
+                // Filter nodes and links
+                const filteredNodes = data.nodes.filter(node => connectedNodeIds.has(node.id));
+                const filteredLinks = connectedLinks;
+
+                return {
+                    nodes: filteredNodes,
+                    links: filteredLinks
+                };
+            }, [data, selectedNode]);
+
+            const handleClick = useCallback(node => {
+                // Aim at node from outside it
+                const distance = 90;
+                const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
+
+                fgRef.current.cameraPosition(
+                    {x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio}, // new position
+                    node, // lookAt ({ x, y, z })
+                    3000  // ms transition duration
+                );
+            }, [fgRef]);
+
+            const handleNodeRightClick = useCallback(node => {
+                // Toggle selection - if clicking the same node, deselect it
+                if (selectedNode && selectedNode.id === node.id) {
+                    setSelectedNode(null);
+                } else {
+                    setSelectedNode(node);
+                }
+            }, [selectedNode]);
+
+            return <ForceGraph3D
+                ref={fgRef}
+                backgroundColor="#000003"
+                graphData={filteredData}
+                nodeLabel="id"
+                nodeAutoColorBy="group"
+                nodeVal="size"
+                onNodeClick={handleClick}
+                onNodeRightClick={handleNodeRightClick}
+                nodeThreeObjectExtend={true}
+                linkWidth={2}
+                nodeThreeObject={node => {
+                    const sprite = new SpriteText(node.id);
+                    sprite.color = node.color;
+                    sprite.textHeight = 5;
+                    sprite.center.y = -1.6; // shift above node
+                    // Highlight the selected node
+                    if (selectedNode && selectedNode.id === node.id) {
+                        sprite.textHeight = 7;
+                        sprite.fontWeight = 'bold';
+                    }
+                    return sprite;
+                }}
+            />;
+        };
+
+        createRoot(document.getElementById('graph'))
+            .render(<FocusGraph/>);
+    }).catch(err => {
+        console.error('Error loading data:', err);
+        document.getElementById('graph').innerHTML = '<p style="color: red; padding: 20px;">Error loading graph data. Please check the console.</p>';
+    });
+</script>
+</body>
