@@ -82,8 +82,26 @@ export default function Home() {
         const places = Array.isArray(entities.places) ? entities.places : [];
         const events = Array.isArray(entities.events) ? entities.events : [];
         
+        // Create journal entry node
+        const journalEntryId = `journal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const journalEntryNode = {
+          id: journalEntryId,
+          name: analysis.title || `Journal Entry ${new Date().toLocaleDateString()}`,
+          type: 'journal' as const,
+          val: 10,
+          color: '#8B5CF6', // Purple for journal entries
+          metadata: { 
+            source: 'journal', 
+            timestamp: new Date().toISOString(),
+            description: journalText,
+            summary: analysis.summary || '',
+            insights: analysis.insights || []
+          }
+        };
+
         // Add entities as nodes with proper GraphNode structure
         const entitiesToAdd = [
+          journalEntryNode, // Add journal entry as the main node
           ...people.map((person: string) => ({
             id: `person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             name: person,
@@ -110,17 +128,30 @@ export default function Home() {
           }))
         ];
         
-        // Create connections between entities from the same journal entry
+        // Create connections between journal entry and all extracted entities
         const newLinks = [];
-        if (entitiesToAdd.length > 1) {
-          // Connect all entities from this journal entry to each other
-          for (let i = 0; i < entitiesToAdd.length; i++) {
-            for (let j = i + 1; j < entitiesToAdd.length; j++) {
+        const entityNodes = entitiesToAdd.slice(1); // Skip the journal entry node itself
+        
+        // Connect journal entry to all extracted entities
+        entityNodes.forEach(entity => {
+          newLinks.push({
+            source: journalEntryId,
+            target: entity.id,
+            relationship: 'contains',
+            strength: 0.9,
+            color: '#8B5CF6'
+          });
+        });
+        
+        // Also connect entities to each other if there are multiple
+        if (entityNodes.length > 1) {
+          for (let i = 0; i < entityNodes.length; i++) {
+            for (let j = i + 1; j < entityNodes.length; j++) {
               newLinks.push({
-                source: entitiesToAdd[i].id,
-                target: entitiesToAdd[j].id,
+                source: entityNodes[i].id,
+                target: entityNodes[j].id,
                 relationship: 'mentioned_together',
-                strength: 0.8,
+                strength: 0.7,
                 color: '#94A3B8'
               });
             }
@@ -140,7 +171,8 @@ export default function Home() {
         console.log('Added connections:', newLinks);
         
         // Show success message
-        alert(`✅ Added ${entitiesToAdd.length} entities to your knowledge graph!`);
+        const entityCount = entitiesToAdd.length - 1; // Subtract 1 for the journal entry node
+        alert(`✅ Journal entry saved! Added ${entityCount} entities to your knowledge graph.`);
       }
       
       // Clear the input
@@ -339,6 +371,14 @@ export default function Home() {
             }`}
           >
             Locations
+          </button>
+          <button
+            onClick={() => setFilterByType('journal')}
+            className={`px-3 py-1 rounded-lg transition-colors ${
+              filterByType === 'journal' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Journals
           </button>
         </div>
 

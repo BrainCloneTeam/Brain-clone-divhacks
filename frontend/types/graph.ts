@@ -1,4 +1,4 @@
-export type NodeType = 'person' | 'event' | 'location';
+export type NodeType = 'person' | 'event' | 'location' | 'journal';
 
 export interface GraphNode {
   id: string;
@@ -62,6 +62,7 @@ export const NODE_COLORS: Record<NodeType, string> = {
   person: '#3B82F6',
   event: '#10B981',
   location: '#EF4444',
+  journal: '#8B5CF6',
 };
 
 export const DEFAULT_NODE_SIZE = 5;
