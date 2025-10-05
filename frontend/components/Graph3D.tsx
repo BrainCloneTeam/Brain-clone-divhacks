@@ -3,6 +3,7 @@
 import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react';
 import ForceGraph3D, { ForceGraphMethods } from 'react-force-graph-3d';
 import * as THREE from 'three';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import SpriteText from 'three-spritetext';
 import { useGraphStore } from '@/stores/graphStore';
 import { GraphNode, GraphLink, NODE_COLORS, NodeType } from '@/types/graph';
@@ -146,37 +147,66 @@ export default function Graph3D({
     try {
       const nodeColor = node.color || NODE_COLORS[node.type as NodeType];
       const group = new THREE.Group();
+      const nodeSize = node.val || 6;
+      const isSelected = hoveredNode === node || selectedNode === node;
 
-      const geometry = new THREE.SphereGeometry(node.val || 6, 16, 16);
+      // Create outer glow layers first (so they render behind the main sphere)
+      if (isSelected) {
+        // Outer glow
+        const outerGlowGeometry = new THREE.SphereGeometry(nodeSize * 4, 16, 16);
+        const outerGlowMaterial = new THREE.MeshBasicMaterial({
+          color: nodeColor,
+          transparent: true,
+          opacity: 0.1,
+          depthWrite: false,
+        });
+        const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+        group.add(outerGlow);
+
+        // Middle glow
+        const middleGlowGeometry = new THREE.SphereGeometry(nodeSize * 2.5, 16, 16);
+        const middleGlowMaterial = new THREE.MeshBasicMaterial({
+          color: nodeColor,
+          transparent: true,
+          opacity: 0.2,
+          depthWrite: false,
+        });
+        const middleGlow = new THREE.Mesh(middleGlowGeometry, middleGlowMaterial);
+        group.add(middleGlow);
+      }
+
+      // Inner glow for all nodes
+      const innerGlowGeometry = new THREE.SphereGeometry(nodeSize * 1.5, 16, 16);
+      const innerGlowMaterial = new THREE.MeshBasicMaterial({
+        color: nodeColor,
+        transparent: true,
+        opacity: isSelected ? 0.4 : 0.25,
+        depthWrite: false,
+      });
+      const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
+      group.add(innerGlow);
+
+      // Main sphere - make it more emissive for better bloom effect
+      const geometry = new THREE.SphereGeometry(nodeSize, 16, 16);
       const material = new THREE.MeshPhongMaterial({
         color: nodeColor,
         emissive: nodeColor,
-        emissiveIntensity: hoveredNode === node || selectedNode === node ? 0.5 : 0.2,
-        shininess: 100,
+        emissiveIntensity: isSelected ? 2.0 : 1.5,
+        shininess: 10,
         transparent: true,
         opacity: highlightedNodes.size > 0
           ? highlightedNodes.has(node.id) ? 1 : 0.2
-          : 0.9,
+          : 1.0,
       });
       const sphere = new THREE.Mesh(geometry, material);
       group.add(sphere);
 
-      if (hoveredNode === node || selectedNode === node) {
-        const glowGeometry = new THREE.SphereGeometry((node.val || 6) * 1.5, 8, 8);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-          color: nodeColor,
-          transparent: true,
-          opacity: 0.15,
-        });
-        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        group.add(glow);
-      }
-
+      // Add text label
       const sprite = new SpriteText(node.name);
       sprite.material.depthWrite = false;
       sprite.color = '#ffffff';
       sprite.textHeight = 3;
-      sprite.position.y = (node.val || 6) + 8;
+      sprite.position.y = nodeSize + 8;
       sprite.backgroundColor = 'rgba(0,0,0,0.5)';
       sprite.padding = 2;
       sprite.borderRadius = 2;
@@ -218,6 +248,24 @@ export default function Graph3D({
         const light1 = new THREE.DirectionalLight(0xffffff, 0.6);
         light1.position.set(1, 1, 1);
         scene.add(light1);
+
+        // Set up bloom effect exactly like the working example
+        setTimeout(() => {
+          try {
+            if (graphRef.current) {
+              const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(256, 256), // resolution (can be any size, will be resized)
+                2, // strength
+                1, // radius
+                0.3 // threshold
+              );
+              graphRef.current.postProcessingComposer().addPass(bloomPass);
+              console.log('Bloom effect added successfully');
+            }
+          } catch (error) {
+            console.log('Bloom setup error:', error);
+          }
+        }, 1000);
       } catch (error) {
         console.error('Error setting up scene:', error);
         setRenderError(true);
@@ -300,8 +348,8 @@ export default function Graph3D({
         enablePointerInteraction={true}
         controlType="orbit"
         rendererConfig={{
-          antialias: false,
-          alpha: false,
+          antialias: true,
+          alpha: true,
           powerPreference: 'high-performance',
           failIfMajorPerformanceCaveat: false,
         }}

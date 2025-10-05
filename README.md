@@ -1,13 +1,13 @@
-# BRAIN3
+# BrainClone
 
-bring your memories back to life with BRAIN3. transform photos and docs into an ai-powered 3d knowledge graph of people, places, and moments to explore your memories and share insights.
+bring your memories back to life with BrainClone. transform photos and docs into an ai-powered 3d knowledge graph of people, places, and moments to explore your memories and share insights.
 
 
 <img width="1705" height="1170" alt="graphaura.dev" src="https://github.com/user-attachments/assets/4ac6691d-14dd-4a4e-893e-956cff0e8063" />
 
 ## repos
 
-- BRAIN3: this monorepo with frontend and backend
+- BrainClone: this monorepo with frontend and backend
 - r2r: external service for ingestion, chunking, embeddings, and RAG
 
 ## tech stack

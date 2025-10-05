@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BRAIN3 - Knowledge Graph Visualization",
+  title: "BrainClone - Knowledge Graph Visualization",
   description: "AI-powered knowledge graph for bringing your memories to life",
 };
 

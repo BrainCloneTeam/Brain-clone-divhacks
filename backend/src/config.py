@@ -13,7 +13,7 @@ class Settings(BaseSettings):
         extra="ignore",  # Allow extra fields in .env
     )
 
-    app_name: str = "BRAIN3"
+    app_name: str = "BrainClone"
     app_version: str = "0.1.0"
     debug: bool = Field(default=False, description="Debug mode")
     environment: str = Field(default="development", description="Environment (development, staging, production)")

@@ -1,4 +1,4 @@
-app = "brain3-backend"
+app = "brainclone-backend"
 primary_region = "iad"
 
 [build]

@@ -38,17 +38,17 @@ neo4j_db = Neo4jDB()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting BRAIN3 backend", environment=settings.environment)
+    logger.info("Starting BrainClone backend", environment=settings.environment)
 
     try:
         # Initialize mock data service for GraphAura demo
-        logger.info("Initializing BRAIN3 with sample memory data")
+        logger.info("Initializing BrainClone with sample memory data")
         mock_data_service = MockDataService()
         app.state.mock_data_service = mock_data_service
         app.state.neo4j_service = None
         app.state.vector_service = None
         app.state.r2r_service = None
-        logger.info("BRAIN3 demo mode initialized with sample memories")
+        logger.info("BrainClone demo mode initialized with sample memories")
 
     except Exception as e:
         logger.error("Failed to initialize services", error=str(e))
@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("Shutting down BRAIN3 backend")
+    logger.info("Shutting down BrainClone backend")
 
     try:
         await postgres_db.disconnect()
@@ -121,7 +121,7 @@ async def health_check():
     health_status["services"]["r2r"] = "demo_mode"
     health_status["services"]["mock_data"] = "active"
     health_status["status"] = "demo_mode"
-    health_status["message"] = "BRAIN3 running with sample memory data"
+    health_status["message"] = "BrainClone running with sample memory data"
 
     return health_status
 

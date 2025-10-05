@@ -1,6 +1,6 @@
-# BRAIN3 Frontend
+# BrainClone Frontend
 
-This is the frontend for BRAIN3 - an AI-powered knowledge graph for bringing your memories to life. Built with [Next.js](https://nextjs.org) and bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is the frontend for BrainClone - an AI-powered knowledge graph for bringing your memories to life. Built with [Next.js](https://nextjs.org) and bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 

@@ -1,4 +1,4 @@
-# BRAIN3 Backend
+# BrainClone Backend
 
 Multi-modal knowledge graph backend integrating R2R and Neo4j for bringing your memories to life.
 
@@ -40,8 +40,8 @@ cp .env.example .env
 
 ```bash
 # PostgreSQL
-createdb brain3
-psql -d brain3 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+createdb brainclone
+psql -d brainclone -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
 # Neo4j - ensure it's running
 ```
@@ -160,6 +160,6 @@ Key configurations:
 ## Docker Support
 
 ```bash
-docker build -t brain3-backend .
-docker run -p 8000:8000 --env-file .env brain3-backend
+docker build -t brainclone-backend .
+docker run -p 8000:8000 --env-file .env brainclone-backend
 ```

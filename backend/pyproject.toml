@@ -1,7 +1,7 @@
 [project]
-name = "brain3-backend"
+name = "brainclone-backend"
 version = "0.1.0"
-description = "BRAIN3 - multi-modal knowledge graph backend"
+description = "BrainClone - multi-modal knowledge graph backend"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
