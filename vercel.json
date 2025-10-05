@@ -4,10 +4,5 @@
   "outputDirectory": "frontend/.next",
   "installCommand": "cd frontend && pnpm install",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "functions": {
-    "frontend/app/api/*": {
-      "maxDuration": 30
-    }
-  }
+  "regions": ["iad1"]
 }
