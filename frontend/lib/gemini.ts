@@ -68,19 +68,24 @@ JSON only:`;
     // Get sample nodes (first 10) to provide context
     const sampleNodes = nodes.slice(0, 10).map((n: any) => ({
       name: n.name,
-      type: n.type || 'concept'
+      type: n.type || 'concept',
+      description: n.metadata?.description || ''
     }));
+
+    // Get recent journal entries for better context
+    const journalEntries = nodes.filter((n: any) => n.type === 'journal').slice(-3);
 
     const prompt = `You are a helpful AI assistant with access to the user's memory database.
 
 User's question: "${question}"
 
 Memory database contains:
-- ${nodes.length} nodes (concepts, people, places, events)
+- ${nodes.length} nodes (concepts, people, places, events, journal entries)
 - ${links.length} connections between them
 - Sample nodes: ${JSON.stringify(sampleNodes)}
+${journalEntries.length > 0 ? `- Recent journal entries: ${JSON.stringify(journalEntries.map((j: any) => ({ title: j.name, summary: j.metadata?.summary })))}` : ''}
 
-Use this memory data to provide a helpful, contextual response. Reference relevant memories when appropriate:`;
+Use this memory data to provide a helpful, contextual response. Reference relevant memories, people, places, and events when appropriate. If the user asks about something not in their memory, let them know and suggest they add it to their journal.`;
 
     try {
       const result = await this.model.generateContent(prompt);

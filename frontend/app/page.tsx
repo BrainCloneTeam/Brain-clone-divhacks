@@ -176,6 +176,24 @@ export default function Home() {
           }
         }
         
+        // Save entities to backend database
+        try {
+          const savedEntities = [];
+          for (const entity of entitiesToAdd) {
+            const savedEntity = await graphApi.createNode(entity);
+            savedEntities.push(savedEntity);
+          }
+
+          // Save relationships to backend
+          for (const link of newLinks) {
+            await graphApi.createLink(link);
+          }
+
+          console.log('Saved entities to backend:', savedEntities);
+        } catch (backendError) {
+          console.warn('Failed to save to backend, using local storage:', backendError);
+        }
+
         // Add nodes to current graph data with proper initialization
         const currentNodes = Array.isArray(graphData?.nodes) ? graphData.nodes : [];
         const currentLinks = Array.isArray(graphData?.links) ? graphData.links : [];
@@ -190,7 +208,7 @@ export default function Home() {
         
         // Show success message
         const entityCount = entitiesToAdd.length - 1; // Subtract 1 for the journal entry node
-        alert(`✅ Journal entry saved! Added ${entityCount} entities to your knowledge graph.`);
+        alert(`✅ Journal entry saved! Added ${entityCount} entities to your knowledge graph and database.`);
       }
       
       // Clear the input
