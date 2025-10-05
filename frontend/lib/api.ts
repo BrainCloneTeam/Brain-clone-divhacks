@@ -274,11 +274,7 @@ export const graphApi = {
       
       return {
         ...link,
-        color: '#94A3B8',
-        metadata: {
-          relationship_id: response.data.relationship_id,
-          backend_created: true
-        }
+        color: '#94A3B8'
       };
     } catch (error) {
       console.warn('Failed to create relationship in backend:', error);
