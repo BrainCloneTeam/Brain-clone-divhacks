@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, computed_field
@@ -25,24 +26,24 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, description="Server port")
     workers: int = Field(default=1, description="Number of workers")
 
-    secret_key: str = Field(default="your-secret-key-change-in-production", description="Secret key for JWT")
-    algorithm: str = Field(default="HS256", description="JWT algorithm")
+    secret_key: str = Field(default=os.getenv("JWT_SECRET_KEY"), description="Secret key for JWT")
+    algorithm: str = Field(default=os.getenv("JWT_ALGORITHM"), description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=30, description="Access token expiration in minutes")
 
-    postgres_user: str = Field(default="postgres", description="PostgreSQL user")
-    postgres_password: str = Field(default=r"\HWqeE1u2/iVg2.gRo2z", description="PostgreSQL password")
-    postgres_host: str = Field(default="localhost", description="PostgreSQL host")
-    postgres_port: int = Field(default=5432, description="PostgreSQL port")
-    postgres_db: str = Field(default="brainclone", description="PostgreSQL database name")
+    postgres_user: str = Field(default=os.getenv("POSTGRES_USER"), description="PostgreSQL user")
+    postgres_password: str = Field(default=os.getenv("POSTGRES_PASSWORD"), description="PostgreSQL password")
+    postgres_host: str = Field(default=os.getenv("POSTGRES_HOST"), description="PostgreSQL host")
+    postgres_port: int = Field(default=os.getenv("POSTGRES_PORT"), description="PostgreSQL port")
+    postgres_db: str = Field(default=os.getenv("POSTGRES_DB"), description="PostgreSQL database name")
 
     @computed_field
     @property
     def postgres_url(self) -> str:
         return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
-    neo4j_uri: str = Field(default="neo4j+s://896d4b81.databases.neo4j.io", description="Neo4j URI")
-    neo4j_user: str = Field(default="neo4j", description="Neo4j user")
-    neo4j_password: str = Field(default="_GSrxhZwzVYI7nOfirY9Ve7TpbeeLTFsGxpX-sdeSTM", description="Neo4j password")
+    neo4j_uri: str = Field(default=os.getenv("NEO4J_URI"), description="Neo4j URI")
+    neo4j_user: str = Field(default=os.getenv("NEO4J_USER"), description="Neo4j user")
+    neo4j_password: str = Field(default=os.getenv("NEO4J_PASSWORD"), description="Neo4j password")
     neo4j_database: str = Field(default="neo4j", description="Neo4j database name")
 
     r2r_base_url: str = Field(default="http://localhost:7272", description="R2R API base URL")

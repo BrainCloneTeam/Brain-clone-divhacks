@@ -1,13 +1,13 @@
 # R2R Production Configuration
 
 app:
-  project_name: "GraphAura R2R"
+  project_name: "BrainClone R2R"
 
 completion:
   provider: "anthropic"
   generation_config:
     model: "claude-opus-4-1-20250805"
-    temperature: 0.1
+    temperature: 0.1c
     top_p: 1.0
     max_tokens_to_sample: 1024
     stream: false
@@ -48,11 +48,11 @@ auth:
   refresh_token_lifetime_in_days: 7
   require_authentication: true
   require_email_verification: false
-  default_admin_email: "admin@graphaura.com"
-  default_admin_password: "change-me-in-production"
+  default_admin_email: ${ADMIN_EMAIL}
+  default_admin_password: ${ADMIN_PASSWORD}
 
 agent:
-  system_instruction_name: "graphaura_system"
+  system_instruction_name: "brainclone_system"
   tool_names:
     - "search"
     - "rag"

@@ -11,5 +11,10 @@
   },
   "workspaces": [
     "frontend"
-  ]
+  ],
+  "dependencies": {
+    "@google/genai": "^1.22.0",
+    "opik": "^1.8.65",
+    "opik-gemini": "^0.1.1"
+  }
 }
