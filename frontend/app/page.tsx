@@ -32,9 +32,27 @@ export default function Home() {
     const loadGraphData = async () => {
       setLoading(true);
       try {
+        // First try to load from API (cross-device sync)
+        try {
+          const response = await fetch('/api/graph');
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data.nodes.length > 0) {
+              setGraphData(result.data);
+              console.log('Loaded graph data from API:', result.data.nodes.length, 'nodes,', result.data.links.length, 'links');
+              setLoading(false);
+              setTimeout(() => setAppLoaded(true), 500);
+              return;
+            }
+          }
+        } catch (apiError) {
+          console.log('API not available, falling back to demo data');
+        }
+
+        // Fallback to demo data if API fails or is empty
         const data = await graphApi.getGraph();
         setGraphData(data);
-        console.log('Loaded graph data:', data.nodes.length, 'nodes,', data.links.length, 'links');
+        console.log('Loaded demo graph data:', data.nodes.length, 'nodes,', data.links.length, 'links');
       } catch (error) {
         console.error('Failed to load graph data:', error);
         setError('Failed to load graph data');

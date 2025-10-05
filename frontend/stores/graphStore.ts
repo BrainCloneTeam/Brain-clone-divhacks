@@ -1,5 +1,19 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { GraphData, GraphNode, GraphLink, NodeType } from '@/types/graph';
+
+// Function to sync graph data to API for cross-device persistence
+const syncToAPI = async (data: GraphData) => {
+  try {
+    await fetch('/api/graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (error) {
+    console.warn('Failed to sync graph data to API:', error);
+  }
+};
 
 interface GraphState {
   graphData: GraphData;
@@ -30,18 +44,24 @@ interface GraphState {
   getNeighbors: (nodeId: string) => { nodes: Set<string>; links: Set<string> };
 }
 
-export const useGraphStore = create<GraphState>((set, get) => ({
-  graphData: { nodes: [], links: [] },
-  selectedNode: null,
-  hoveredNode: null,
-  highlightedNodes: new Set(),
-  highlightedLinks: new Set(),
-  filterByType: null,
-  searchQuery: '',
-  isLoading: false,
-  error: null,
+export const useGraphStore = create<GraphState>()(
+  persist(
+    (set, get) => ({
+      graphData: { nodes: [], links: [] },
+      selectedNode: null,
+      hoveredNode: null,
+      highlightedNodes: new Set(),
+      highlightedLinks: new Set(),
+      filterByType: null,
+      searchQuery: '',
+      isLoading: false,
+      error: null,
 
-  setGraphData: (data) => set({ graphData: data }),
+  setGraphData: (data) => {
+    set({ graphData: data });
+    // Sync to API for cross-device persistence
+    syncToAPI(data);
+  },
 
   addNode: (node) =>
     set((state) => ({
@@ -127,4 +147,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     return { nodes: neighborNodes, links: neighborLinks };
   },
-}));
+}),
+{
+  name: 'brainclone-graph-storage', // unique name for localStorage key
+  partialize: (state) => ({ 
+    graphData: state.graphData,
+    // Don't persist UI state like selectedNode, searchQuery, etc.
+  }),
+}
+  )
+);
